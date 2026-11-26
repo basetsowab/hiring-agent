@@ -28,6 +28,7 @@
   - [Ollama models](#ollama-models)
 - [Configuration](#configuration)
 - [How it works](#how-it-works)
+- [HTTP API](#http-api)
 - [CLI usage](#cli-usage)
 - [Directory layout](#directory-layout)
 - [Provider details](#provider-details)
@@ -246,6 +247,58 @@ You can leave it on during iteration. See the next section for details.
 - When `DEVELOPMENT_MODE=True` it creates or appends a per-role `resume_evaluations_<role>.csv` with key fields (columns follow the role's categories), and caches intermediate JSON under `cache/`.
 
 </details>
+
+---
+
+## HTTP API
+
+`api.py` exposes the same pipeline as a REST API (FastAPI).
+
+```bash
+pip install -r requirements.txt
+uvicorn api:app --host 0.0.0.0 --port 8000
+```
+
+Interactive docs are served at `http://localhost:8000/docs`.
+
+| Method | Path | Description |
+|---|---|---|
+| `GET` | `/health` | Liveness check and the configured model |
+| `GET` | `/roles` | Roles available for scoring, with their categories |
+| `POST` | `/score` | Upload a resume PDF (multipart) and get a JSON evaluation |
+
+`POST /score` form fields:
+
+- `file` (required): the resume PDF
+- `role`: role name from `/roles` (defaults to the first role)
+- `include_github`: enrich with GitHub data (default `true`)
+- `github_url`: override the GitHub profile found in the resume
+- `include_resume`: also return the extracted resume JSON (default `false`)
+
+```bash
+curl -F file=@resume/sample.pdf -F role=software_engineering_intern \
+  http://localhost:8000/score
+```
+
+Response:
+
+```json
+{
+  "candidate_name": "Jane Doe",
+  "role": "software_engineering_intern",
+  "model": "gemma4:latest",
+  "github_used": true,
+  "total_score": 72.5,
+  "max_score": 100,
+  "categories": [{"key": "...", "label": "...", "score": 30, "max": 35, "evidence": "..."}],
+  "bonus_points": {"total": 5, "breakdown": "..."},
+  "deductions": {"total": 0, "reasons": ""},
+  "key_strengths": ["..."],
+  "areas_for_improvement": ["..."]
+}
+```
+
+Optional env vars: `CORS_ORIGINS` (comma-separated, default `*`), `MAX_UPLOAD_BYTES` (default 10 MB).
 
 ---
 
